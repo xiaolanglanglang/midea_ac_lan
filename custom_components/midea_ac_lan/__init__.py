@@ -32,6 +32,30 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 from midealocal.device import DeviceType, MideaDevice, ProtocolVersion
 from midealocal.devices import device_selector
+from midealocal import discover as _midea_discover
+
+# Patch _parse_discover_response to handle short packets and log raw data for diagnosis
+_original_parse = _midea_discover._parse_discover_response
+
+
+def _safe_parse_discover_response(sock, found_devices):
+    try:
+        return _original_parse(sock, found_devices)
+    except (IndexError, ValueError) as exc:
+        _LOGGER.warning("Discovery parse error: %s, attempting fallback parse", exc)
+        try:
+            from midealocal.security import LocalSecurity
+            security = LocalSecurity()
+            data, addr = sock.recvfrom(512)
+            ip = addr[0]
+            _LOGGER.warning("Raw packet from %s (%d bytes): %s", ip, len(data), data.hex())
+            _LOGGER.warning("Raw packet header: %s", data[:20].hex() if len(data) >= 20 else data.hex())
+            return 0, None
+        except Exception:
+            return 0, None
+
+
+_midea_discover._parse_discover_response = _safe_parse_discover_response
 
 from .const import (
     ALL_PLATFORM,
