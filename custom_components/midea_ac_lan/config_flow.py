@@ -699,15 +699,25 @@ class MideaLanConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
                 )
                 # discover result MUST exist
                 if len(self.devices) != 1:
-                    return await self.async_step_manually(error="invalid_device_ip")
-                # check all the input, disable error add
-                device_id = next(iter(self.devices.keys()))
+                    # discovery failed (e.g. different subnet), trust user input
+                    device = {
+                        CONF_DEVICE_ID: user_input[CONF_DEVICE_ID],
+                        CONF_TYPE: user_input[CONF_TYPE],
+                        CONF_IP_ADDRESS: user_input[CONF_IP_ADDRESS],
+                        CONF_PORT: user_input[CONF_PORT],
+                        CONF_MODEL: user_input[CONF_MODEL],
+                        CONF_PROTOCOL: user_input[CONF_PROTOCOL],
+                    }
+                    self.devices[user_input[CONF_DEVICE_ID]] = device
+                else:
+                    # check all the input, disable error add
+                    device_id = next(iter(self.devices.keys()))
 
-                # check if device_id is correctly set for that IP
-                if user_input[CONF_DEVICE_ID] != device_id:
-                    return await self.async_step_manually(
-                        error=f"For ip {ip} the device_id MUST be {device_id}",
-                    )
+                    # check if device_id is correctly set for that IP
+                    if user_input[CONF_DEVICE_ID] != device_id:
+                        return await self.async_step_manually(
+                            error=f"For ip {ip} the device_id MUST be {device_id}",
+                        )
 
             device = self.devices[device_id]
             if user_input[CONF_IP_ADDRESS] != device.get(CONF_IP_ADDRESS):
